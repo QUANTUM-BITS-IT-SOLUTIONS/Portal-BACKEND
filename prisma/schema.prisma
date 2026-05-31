@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model PartnerTier {
+  id                   String    @id @default(uuid())
+  name                 String    @unique
+  minReferrals         Int       @default(0)
+  minRevenue           Decimal   @default(0)
+  commissionPercentage Decimal   @default(5)
+  color                String    @default("#6B7280")
+  icon                 String?
+  benefits             String[]
+  isActive             Boolean   @default(true)
+  sortOrder            Int       @default(0)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  students             Student[]
+}
+
+model Student {
+  id                String          @id @default(uuid())
+  name              String
+  email             String          @unique
+  phoneNumber       String
+  universityName    String
+  referralCode      String          @unique
+  commissionPercent Decimal         @default(5)
+  paymentMethod     PaymentMethod?
+  upiId             String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankIfsc          String?
+  createdAt         DateTime        @default(now())
+  password          String
+  bankDetails       Json?           @default("{}")
+  partnerTierId     String?
+  updatedAt         DateTime        @default(now())
+  avatarUrl         String?
+  panNumber         String?
+  panVerified       Boolean         @default(false)
+  status            StudentStatus   @default(ACTIVE)
+  clients           Client[]
+  leadsPipeline     LeadsPipeline[]
+  ledgerEntries     LedgerEntry[]
+  notifications     Notification[]
+  partnerTier       PartnerTier?    @relation(fields: [partnerTierId], references: [id])
+  payouts           StudentPayout[]
+}
+
+model Client {
+  id           String          @id @default(uuid())
+  businessName String
+  businessType String
+  phone        String          @unique
+  email        String          @unique
+  studentId    String
+  createdAt    DateTime        @default(now())
+  password     String
+  status       String          @default("pending")
+  student      Student         @relation(fields: [studentId], references: [id])
+  leads        LeadsPipeline[]
+  notes        String?
+}
+
+model LeadsPipeline {
+  id                  String        @id @default(uuid())
+  studentId           String
+  clientId            String
+  status              LeadStatus    @default(pending)
+  dealAmount          Int?
+  paymentLink         String?
+  paidAt              DateTime?
+  createdAt           DateTime      @default(now())
+  paymentDueDate      DateTime?
+  paymentReceivedDate DateTime?
+  payoutCompletedDate DateTime?
+  payoutScheduledDate DateTime?
+  updatedAt           DateTime      @default(now())
+  notes               String?
+  paymentType         String           @default("full")
+  paymentPercentage   Int              @default(100)
+  commissionRate      Decimal          @default(5)
+  commissionStatus    CommissionStatus @default(pending)
+  client              Client           @relation(fields: [clientId], references: [id])
+  student             Student          @relation(fields: [studentId], references: [id])
+  ledger              LedgerEntry[]
+}
+
+model LedgerEntry {
+  id              String         @id @default(uuid())
+  leadsPipelineId String?
+  studentId       String?
+  type            LedgerType
+  amount          Int
+  isPartial       Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  payoutId        String?
+  leadsPipeline   LeadsPipeline? @relation(fields: [leadsPipelineId], references: [id])
+  payout          StudentPayout? @relation(fields: [payoutId], references: [id])
+  student         Student?       @relation(fields: [studentId], references: [id])
+
+  @@index([leadsPipelineId, type])
+  @@index([createdAt])
+}
+
+model StudentPayout {
+  id             String         @id @default(uuid())
+  studentId      String
+  amount         Decimal        @default(0)
+  completedDate  DateTime?
+  createdAt      DateTime       @default(now())
+  notes          String?
+  paymentDetails Json?          @default("{}")
+  paymentMethod  PaymentMethod?
+  proofUrl       String?
+  scheduledDate  DateTime?
+  status         PayoutStatus   @default(pending)
+  paidAt         DateTime?
+  updatedAt      DateTime       @updatedAt
+  ledgerEntries  LedgerEntry[]
+  student        Student        @relation(fields: [studentId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String?
+  oldValues  Json?
+  newValues  Json?
+  metadata   Json?    @default("{}")
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  studentId   String
+  type        NotificationType
+  title       String
+  description String
+  read        Boolean          @default(false)
+  readAt      DateTime?
+  amount      Decimal?
+  createdAt   DateTime         @default(now())
+  student     Student          @relation(fields: [studentId], references: [id])
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  BANNED
+}
+
+enum LeadStatus {
+  pending
+  payment_sent
+  paid
+  cancelled
+  negotiating
+  lead_added
+  team_approval
+  payment_link
+  invoice
+  client_pays
+  work_starts
+  commission_approved
+}
+
+enum PaymentMethod {
+  upi
+  bank
+  paypal
+  other
+  bank_transfer
+}
+
+enum LedgerType {
+  client_payment
+  student_commission
+  payout_sent
+}
+
+enum PayoutStatus {
+  pending
+  scheduled
+  processing
+  completed
+  failed
+}
+
+enum CommissionStatus {
+  pending
+  approved
+  held
+  rejected
+  paid
+}
+
+enum NotificationType {
+  conversion
+  payment
+  milestone
+  achievement
+  system
+}
